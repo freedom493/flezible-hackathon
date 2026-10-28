@@ -1,9 +1,65 @@
+import { useState, useEffect } from 'preact/hooks'
 import { Link } from 'wouter-preact'
-import { Check, ShieldCheck, Sparkles } from 'lucide-preact'
-import { PLANS } from '../lib/plans.js'
+import { Check, ShieldCheck, Sparkles, Loader2 } from 'lucide-preact'
+import { PLANS as FALLBACK_PLANS } from '../lib/plans.js'
 import { formatNaira } from '../lib/format.js'
+import { supabase } from '../lib/supabase.js'
 
 export function Pricing() {
+  const [plans, setPlans] = useState(FALLBACK_PLANS)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadPlans() {
+      try {
+        const { data, error } = await supabase
+          .from('plans')
+          .select('*, plan_prices(*)')
+          .order('sort')
+
+        if (error) {
+          console.warn('Could not load plans from DB, using local constant:', error.message)
+          setPlans(FALLBACK_PLANS)
+        } else if (data && data.length > 0) {
+          const formatted = data.map((p) => {
+            const bps = p.commission_bps || 0
+            const commissionPercent =
+              bps % 100 === 0 ? `${bps / 100}%` : `${(bps / 100).toFixed(1)}%`
+
+            // Normalize prices
+            const prices = (p.plan_prices || []).map((pp) => ({
+              period: pp.period,
+              periodLabel: pp.period === 'daily' ? 'day' : pp.period === 'weekly' ? 'week' : 'month',
+              amount_kobo: pp.amount_kobo,
+            }))
+
+            // Sort prices: daily, weekly, monthly
+            const periodOrder = { daily: 1, weekly: 2, monthly: 3 }
+            prices.sort((a, b) => (periodOrder[a.period] || 9) - (periodOrder[b.period] || 9))
+
+            return {
+              id: p.id,
+              name: p.name,
+              commission_bps: p.commission_bps,
+              commissionPercent,
+              trial_days: p.trial_days || 14,
+              features: Array.isArray(p.features) ? p.features : JSON.parse(p.features || '[]'),
+              prices: prices.length > 0 ? prices : (FALLBACK_PLANS.find((fb) => fb.id === p.id)?.prices || []),
+            }
+          })
+          setPlans(formatted)
+        }
+      } catch (err) {
+        console.warn('Error reading plans:', err)
+        setPlans(FALLBACK_PLANS)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadPlans()
+  }, [])
+
   return (
     <div className="min-h-screen bg-surface py-12 sm:py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,10 +77,18 @@ export function Pricing() {
           </p>
         </div>
 
+        {loading && (
+          <div className="flex justify-center items-center py-8 text-muted text-sm gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-brand" />
+            <span>Loading latest plans...</span>
+          </div>
+        )}
+
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
-          {PLANS.map((plan) => {
+          {plans.map((plan) => {
             const isFeatured = plan.id === 'B'
+            const monthlyPrice = plan.prices?.find((p) => p.period === 'monthly')
 
             return (
               <div
@@ -84,7 +148,7 @@ export function Pricing() {
                         <span className="text-sm text-muted">Monthly billing</span>
                         <div className="text-right">
                           <span className="text-2xl font-bold font-heading text-ink">
-                            {formatNaira(plan.prices[0].amount_kobo)}
+                            {formatNaira(monthlyPrice?.amount_kobo || 0)}
                           </span>
                           <span className="text-xs text-muted"> / month</span>
                         </div>

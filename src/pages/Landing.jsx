@@ -1,8 +1,120 @@
-import { useState } from 'preact/hooks'
-import { MessageSquare, MapPin, Truck, CheckCircle2 } from 'lucide-preact'
+import { useState, useEffect } from 'preact/hooks'
+import { useLocation } from 'wouter-preact'
+import { MessageSquare, MapPin, Truck, CheckCircle2, Loader2, AlertCircle } from 'lucide-preact'
+import { supabase } from '../lib/supabase.js'
+import { useAuth } from '../lib/auth.jsx'
 
 export function Landing() {
+  const [, setLocation] = useLocation()
+  const { user, profile, loading: authLoading } = useAuth()
+
   const [authMode, setAuthMode] = useState('signin') // 'signin' | 'signup'
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+
+  // If already authenticated and profile exists, redirect to dashboard or onboarding
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (profile) {
+        setLocation('/dashboard')
+      } else {
+        setLocation('/onboarding')
+      }
+    }
+  }, [user, profile, authLoading, setLocation])
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault()
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    if (!email || !password) {
+      setErrorMessage('Please enter both email and password.')
+      return
+    }
+
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters.')
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      if (authMode === 'signin') {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        })
+
+        if (error) {
+          setErrorMessage(error.message)
+          setSubmitting(false)
+          return
+        }
+
+        if (data?.user) {
+          // Check profile
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .maybeSingle()
+
+          if (prof) {
+            setLocation('/dashboard')
+          } else {
+            setLocation('/onboarding')
+          }
+        }
+      } else {
+        // Sign up
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        })
+
+        if (error) {
+          setErrorMessage(error.message)
+          setSubmitting(false)
+          return
+        }
+
+        if (data?.session) {
+          // Direct login without email confirm
+          setLocation('/onboarding')
+        } else if (data?.user) {
+          setSuccessMessage(
+            'Account created! If email confirmation is enabled, please check your inbox.'
+          )
+        }
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'An unexpected error occurred.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage('')
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/dashboard',
+        },
+      })
+      if (error) {
+        setErrorMessage(error.message)
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Google sign in failed.')
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -97,7 +209,7 @@ export function Landing() {
               </div>
             </div>
 
-            {/* Right: Auth Panel (VISUAL ONLY) */}
+            {/* Right: Auth Panel */}
             <div id="auth" className="lg:col-span-5 flex flex-col justify-center">
               <div className="bg-card border border-outline rounded-3xl p-6 sm:p-8 shadow-sm">
                 <div className="mb-6">
@@ -111,9 +223,26 @@ export function Landing() {
                   </p>
                 </div>
 
+                {/* Error Banner */}
+                {errorMessage && (
+                  <div className="mb-5 p-3.5 rounded-xl bg-danger/10 border border-danger/20 flex items-start gap-2.5 text-danger text-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span className="leading-snug">{errorMessage}</span>
+                  </div>
+                )}
+
+                {/* Success Banner */}
+                {successMessage && (
+                  <div className="mb-5 p-3.5 rounded-xl bg-tonal border border-brand/30 flex items-start gap-2.5 text-brand-deep text-xs">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-brand" />
+                    <span className="leading-snug">{successMessage}</span>
+                  </div>
+                )}
+
                 {/* Continue with Google button */}
                 <button
                   type="button"
+                  onClick={handleGoogleSignIn}
                   className="w-full min-h-[44px] px-4 py-2.5 rounded-full border border-outline bg-card hover:bg-tonal text-ink font-medium text-sm flex items-center justify-center gap-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
@@ -146,8 +275,8 @@ export function Landing() {
                   </span>
                 </div>
 
-                {/* Form (Visual Only, does not submit) */}
-                <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+                {/* Form */}
+                <form onSubmit={handleAuthSubmit} className="space-y-4">
                   <div>
                     <label htmlFor="auth-email" className="block text-xs font-semibold text-ink mb-1.5">
                       Email address
@@ -155,6 +284,9 @@ export function Landing() {
                     <input
                       id="auth-email"
                       type="email"
+                      required
+                      value={email}
+                      onInput={(e) => setEmail(e.currentTarget.value)}
                       autoComplete="email"
                       placeholder="you@example.com"
                       className="w-full min-h-[44px] px-3.5 py-2 rounded-xl bg-surface border border-outline text-ink placeholder:text-muted/60 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:border-brand transition-colors"
@@ -168,6 +300,9 @@ export function Landing() {
                     <input
                       id="auth-password"
                       type="password"
+                      required
+                      value={password}
+                      onInput={(e) => setPassword(e.currentTarget.value)}
                       autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'}
                       placeholder="••••••••"
                       className="w-full min-h-[44px] px-3.5 py-2 rounded-xl bg-surface border border-outline text-ink placeholder:text-muted/60 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:border-brand transition-colors"
@@ -176,9 +311,11 @@ export function Landing() {
 
                   <button
                     type="submit"
-                    className="w-full min-h-[44px] mt-2 px-4 py-2.5 rounded-full bg-brand hover:bg-brand-deep text-white font-semibold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 shadow-xs"
+                    disabled={submitting}
+                    className="w-full min-h-[44px] mt-2 px-4 py-2.5 rounded-full bg-brand hover:bg-brand-deep text-white font-semibold text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 shadow-xs flex items-center justify-center gap-2 disabled:opacity-70"
                   >
-                    {authMode === 'signin' ? 'Sign in' : 'Create account'}
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin text-white" />}
+                    <span>{authMode === 'signin' ? 'Sign in' : 'Create account'}</span>
                   </button>
                 </form>
 
@@ -186,7 +323,11 @@ export function Landing() {
                 <div className="mt-5 text-center">
                   <button
                     type="button"
-                    onClick={() => setAuthMode((prev) => (prev === 'signin' ? 'signup' : 'signin'))}
+                    onClick={() => {
+                      setErrorMessage('')
+                      setSuccessMessage('')
+                      setAuthMode((prev) => (prev === 'signin' ? 'signup' : 'signin'))
+                    }}
                     className="min-h-[44px] text-xs text-muted hover:text-brand font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-lg px-2"
                   >
                     {authMode === 'signin' ? (

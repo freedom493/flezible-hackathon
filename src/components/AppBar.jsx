@@ -1,13 +1,21 @@
 import { useState } from 'preact/hooks'
 import { Link, useLocation } from 'wouter-preact'
-import { Menu, X, Egg } from 'lucide-preact'
+import { Menu, X, Egg, LogOut, LayoutDashboard } from 'lucide-preact'
+import { useAuth } from '../lib/auth.jsx'
 
 export function AppBar() {
   const [isOpen, setIsOpen] = useState(false)
-  const [location] = useLocation()
+  const [location, setLocation] = useLocation()
+  const { user, profile, signOut } = useAuth()
 
   const toggleMenu = () => setIsOpen((prev) => !prev)
   const closeMenu = () => setIsOpen(false)
+
+  const handleSignOut = async () => {
+    closeMenu()
+    await signOut()
+    setLocation('/')
+  }
 
   return (
     <header className="sticky top-0 z-40 w-full bg-card/95 backdrop-blur-sm border-b border-outline">
@@ -29,28 +37,72 @@ export function AppBar() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-2" aria-label="Main Navigation">
-            <a
-              href="/#how-it-works"
-              className="px-4 py-2 text-sm font-medium text-ink hover:text-brand rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center"
-            >
-              How it works
-            </a>
-            <Link
-              href="/pricing"
-              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center ${
-                location === '/pricing'
-                  ? 'bg-tonal text-brand-deep font-semibold'
-                  : 'text-ink hover:text-brand'
-              }`}
-            >
-              Pricing
-            </Link>
-            <a
-              href="/#auth"
-              className="ml-2 px-5 py-2 text-sm font-semibold text-white bg-brand hover:bg-brand-deep rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center shadow-xs"
-            >
-              Sign in
-            </a>
+            {user ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  className={`px-4 py-2 text-sm font-medium rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center gap-1.5 ${
+                    location === '/dashboard'
+                      ? 'bg-tonal text-brand-deep font-semibold'
+                      : 'text-ink hover:text-brand'
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+
+                <Link
+                  href="/pricing"
+                  className={`px-4 py-2 text-sm font-medium rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center ${
+                    location === '/pricing'
+                      ? 'bg-tonal text-brand-deep font-semibold'
+                      : 'text-ink hover:text-brand'
+                  }`}
+                >
+                  Pricing
+                </Link>
+
+                {profile?.role && (
+                  <span className="ml-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-tonal text-brand-deep">
+                    {profile.role}
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="ml-2 px-4 py-2 text-sm font-medium text-muted hover:text-danger rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-danger min-h-[44px] flex items-center gap-1.5"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign out</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <a
+                  href="/#how-it-works"
+                  className="px-4 py-2 text-sm font-medium text-ink hover:text-brand rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center"
+                >
+                  How it works
+                </a>
+                <Link
+                  href="/pricing"
+                  className={`px-4 py-2 text-sm font-medium rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center ${
+                    location === '/pricing'
+                      ? 'bg-tonal text-brand-deep font-semibold'
+                      : 'text-ink hover:text-brand'
+                  }`}
+                >
+                  Pricing
+                </Link>
+                <a
+                  href="/#auth"
+                  className="ml-2 px-5 py-2 text-sm font-semibold text-white bg-brand hover:bg-brand-deep rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 min-h-[44px] flex items-center shadow-xs"
+                >
+                  Sign in
+                </a>
+              </>
+            )}
           </nav>
 
           {/* Mobile Menu Button (min 44x44 touch target) */}
@@ -70,31 +122,61 @@ export function AppBar() {
       {/* Mobile Dropdown Menu */}
       {isOpen && (
         <div id="mobile-menu" className="md:hidden border-b border-outline bg-card px-4 pt-2 pb-6 space-y-2 shadow-lg">
-          <a
-            href="/#how-it-works"
-            onClick={closeMenu}
-            className="flex items-center px-4 py-3 rounded-xl text-base font-medium text-ink hover:bg-tonal transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            How it works
-          </a>
-          <Link
-            href="/pricing"
-            onClick={closeMenu}
-            className={`flex items-center px-4 py-3 rounded-xl text-base font-medium transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-              location === '/pricing'
-                ? 'bg-tonal text-brand-deep font-semibold'
-                : 'text-ink hover:bg-tonal'
-            }`}
-          >
-            Pricing
-          </Link>
-          <a
-            href="/#auth"
-            onClick={closeMenu}
-            className="flex items-center justify-center px-4 py-3 rounded-full text-base font-semibold text-white bg-brand hover:bg-brand-deep transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand shadow-xs"
-          >
-            Sign in
-          </a>
+          {user ? (
+            <>
+              <Link
+                href="/dashboard"
+                onClick={closeMenu}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-base font-medium text-ink hover:bg-tonal transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <LayoutDashboard className="w-5 h-5 text-brand" />
+                <span>Dashboard</span>
+              </Link>
+              <Link
+                href="/pricing"
+                onClick={closeMenu}
+                className="flex items-center px-4 py-3 rounded-xl text-base font-medium text-ink hover:bg-tonal transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                Pricing
+              </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-4 py-3 rounded-xl text-base font-medium text-danger hover:bg-danger/10 transition-colors min-h-[44px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
+              >
+                <LogOut className="w-5 h-5" />
+                <span>Sign out</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <a
+                href="/#how-it-works"
+                onClick={closeMenu}
+                className="flex items-center px-4 py-3 rounded-xl text-base font-medium text-ink hover:bg-tonal transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                How it works
+              </a>
+              <Link
+                href="/pricing"
+                onClick={closeMenu}
+                className={`flex items-center px-4 py-3 rounded-xl text-base font-medium transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                  location === '/pricing'
+                    ? 'bg-tonal text-brand-deep font-semibold'
+                    : 'text-ink hover:bg-tonal'
+                }`}
+              >
+                Pricing
+              </Link>
+              <a
+                href="/#auth"
+                onClick={closeMenu}
+                className="flex items-center justify-center px-4 py-3 rounded-full text-base font-semibold text-white bg-brand hover:bg-brand-deep transition-colors min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand shadow-xs"
+              >
+                Sign in
+              </a>
+            </>
+          )}
         </div>
       )}
     </header>
