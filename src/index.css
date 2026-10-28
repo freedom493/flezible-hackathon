@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+@theme {
+  --font-heading: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
+
+  --color-brand: #059669;
+  --color-brand-deep: #047857;
+  --color-night: #052e22;
+  --color-amber: #f59e0b;
+  --color-surface: #f7faf8;
+  --color-card: #ffffff;
+  --color-tonal: #e6f4ee;
+  --color-outline: #dbe5df;
+  --color-ink: #0b1f17;
+  --color-muted: #5b6b63;
+  --color-danger: #b3261e;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
